@@ -1,0 +1,307 @@
+---
+title: "Exports and Imports Forecast"
+author: "Fabián Villarreal"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+<br />
+
+
+
+#### **Exports and Imports Forecast with Univariate Time Series**
+
+This R script makes a prediction of Ecuador's oil and non-oil exports and imports, using ARIMA and Holt-Winters models.
+
+```{r libraries, echo = TRUE, results = 'hide', warning = FALSE, message = FALSE}
+# Libraries
+library(tidyverse)
+library(readxl)
+library(foreign)
+library(ggfortify)
+library(timeDate)
+library(forecast)
+library(xts)
+library(urca)
+library(tseries)
+library(xlsx)
+
+rm(list=ls())
+```
+
+
+
+#### **Data**
+```{r}
+# Data
+wd <- 'C:/Users/fvill/Dropbox/BCE/Otros/Exportacion_Importacion Forecast'
+setwd(wd)
+
+df <- read_excel('export_import_petro_no_petro.xlsx')
+```
+
+```{r plot1, fig.width = 7, fig.height = 4}
+# Oil Exports
+export_petr <- ts(df[,'export_petr'], frequency = 12, start = c(1990,1), end = c(2021,12))
+autoplot(export_petr) + ggtitle('Oil Exports') + ylab('Million USD FOB')
+```
+
+```{r plot2, fig.width = 7, fig.height = 4}
+# Non-Oil Exports
+export_no_petr <- ts(df[,'export_no_petr'], frequency = 12, start = c(1990,1), end = c(2021,12))
+autoplot(export_no_petr) + ggtitle('Non-Oil Exports') + ylab('Million USD FOB')
+```
+
+```{r plot3, fig.width = 7, fig.height = 4}
+# Oil Imports
+import_petr <- ts(df[,'import_petr'], frequency = 12, start = c(1990,1), end = c(2021,12))
+autoplot(import_petr) + ggtitle('Oil Imports') + ylab('Million USD FOB')
+```
+
+```{r plot4, fig.width = 7, fig.height = 4}
+# Non-Oil Exports
+import_no_petr <- ts(df[,'import_no_petr'], frequency = 12, start = c(1990,1), end = c(2021,12))
+autoplot(import_no_petr) + ggtitle('Non-Oil Imports') + ylab('Million USD FOB')
+```
+<br />
+
+
+
+#### **Unit Root Tests**
+Determine the number of differences to calculate
+
+```{r unit_root1, collapse = TRUE}
+# Oil Exports
+ndiffs(export_petr)
+nsdiffs(export_petr)
+export_petr %>% ur.kpss() %>% summary() # Not stationary
+adf.test(export_petr) # Not stationary
+``` 
+
+```{r unit_root2, collapse = TRUE}
+# Non-Oil Exports
+ndiffs(export_no_petr) 
+nsdiffs(export_no_petr)
+export_no_petr %>% ur.kpss() %>% summary() # Not stationary
+adf.test(export_no_petr) # Not stationary
+``` 
+
+```{r unit_root3, collapse = TRUE}
+# Oil Imports
+ndiffs(import_petr) 
+nsdiffs(import_petr) 
+import_petr %>% ur.kpss() %>% summary() # Not stationary
+adf.test(import_petr) # Not stationary
+``` 
+
+```{r unit_root4, collapse = TRUE}
+# Non-Oil Imports
+ndiffs(import_no_petr)
+nsdiffs(import_no_petr)
+import_no_petr %>% ur.kpss() %>% summary() # Not stationary
+adf.test(import_no_petr) # Not stationary
+```
+<br />
+
+
+
+#### **ARIMA model estimation**
+<br />
+
+##### **Oil Exports**
+```{r arima1, collapse = TRUE}
+export_petr.arima1 <- auto.arima(export_petr, seasonal = FALSE, d = 1)
+export_petr.arima2 <- auto.arima(export_petr, seasonal = FALSE, d = 1,
+                        approximation = FALSE, 
+                        stepwise = FALSE)
+export_petr.arima3 <- auto.arima(export_petr, seasonal = TRUE, d = 1)
+export_petr.arima4 <- auto.arima(export_petr, seasonal = TRUE, d = 1,
+                        approximation = FALSE, 
+                        stepwise = FALSE)
+
+# Determine the best model using the AIC criterion
+export_petr_m <- rep(0,4)
+export_petr_m[1] <- export_petr.arima1$aic
+export_petr_m[2] <- export_petr.arima2$aic
+export_petr_m[3] <- export_petr.arima3$aic
+export_petr_m[4] <- export_petr.arima4$aic
+export_petr_m
+which(export_petr_m == min(export_petr_m))
+``` 
+```{r arima1_res, fig.width = 7, fig.height = 4}
+checkresiduals(export_petr.arima2)
+export_petr.arima2
+
+autoplot(forecast(export_petr.arima2)) + 
+  ggtitle('Oil Exports ARIMA(3,1,2)') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(export_petr.arima2)),
+           'ep_arima.xlsx', 
+           sheetName = 'ExporPetro')
+```
+
+##### **Non-Oil Exports**
+```{r arima2, collapse = TRUE}
+export_no_petr.arima1 <- auto.arima(export_no_petr, seasonal = FALSE, d = 1)
+export_no_petr.arima2 <- auto.arima(export_no_petr, seasonal = FALSE, d = 1,
+                                    approximation = FALSE,
+                                    stepwise = FALSE)
+export_no_petr.arima3 <- auto.arima(export_no_petr, seasonal = TRUE, d = 1)
+export_no_petr.arima4 <- auto.arima(export_no_petr, seasonal = TRUE, d = 1,
+                                    approximation = FALSE,
+                                    stepwise = FALSE)
+
+# Determine the best model using the AIC criterion
+export_no_petr_m <- rep(0,4)
+export_no_petr_m[1] <- export_no_petr.arima1$aic
+export_no_petr_m[2] <- export_no_petr.arima2$aic
+export_no_petr_m[3] <- export_no_petr.arima3$aic
+export_no_petr_m[4] <- export_no_petr.arima4$aic
+export_no_petr_m
+which(export_no_petr_m == min(export_no_petr_m))
+``` 
+```{r arima2_res, fig.width = 7, fig.height = 4}
+checkresiduals(export_no_petr.arima4) # Estimate with an AR 4
+
+export_no_petr.fit1 <- Arima(export_no_petr, order = c(4,1,2), seasonal = c(2,0,0))
+checkresiduals(export_no_petr.fit1)
+export_no_petr.fit1
+
+autoplot(forecast(export_no_petr.fit1)) + 
+  ggtitle('Non-Oil Exports SARIMA(4,1,2)(2,0,0)[12]') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(export_no_petr.fit1)),
+           'enp_arima.xlsx', 
+           sheetName = 'ExporNoPetro')
+```
+
+##### **Oil Imports**
+```{r arima3, collapse = TRUE}
+import_petr.arima1 <- auto.arima(import_petr, seasonal = FALSE, d = 1)
+import_petr.arima2 <- auto.arima(import_petr, seasonal = FALSE, d = 1,
+                                 approximation = FALSE,
+                                 stepwise = FALSE)
+import_petr.arima3 <- auto.arima(import_petr, seasonal = TRUE, d = 1)
+import_petr.arima4 <- auto.arima(import_petr, seasonal = TRUE, d = 1,
+                                 approximation = FALSE,
+                                 stepwise = FALSE)
+
+# Determine the best model using the AIC criterion
+import_petr_m <- rep(0,4)
+import_petr_m[1] <- import_petr.arima1$aic
+import_petr_m[2] <- import_petr.arima2$aic
+import_petr_m[3] <- import_petr.arima3$aic
+import_petr_m[4] <- import_petr.arima4$aic
+import_petr_m
+which(import_petr_m == min(import_petr_m))
+``` 
+```{r arima3_res, fig.width = 7, fig.height = 4}
+checkresiduals(import_petr.arima1) # Estimate with an AR 1
+
+import_petr.fit1 <- Arima(import_petr, order = c(1,1,2))
+checkresiduals(import_petr.fit1)
+import_petr.fit1
+
+autoplot(forecast(import_petr.fit1)) + 
+  ggtitle('Oil Imports ARIMA(1,1,2)') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(import_petr.fit1)),
+           'ip_arima.xlsx', 
+           sheetName = 'ImporPetro')
+```
+
+##### **Non-Oil Imports**
+```{r arima4, collapse = TRUE}
+import_no_petr.arima1 <- auto.arima(import_no_petr, seasonal = FALSE, d = 1)
+import_no_petr.arima2 <- auto.arima(import_no_petr, seasonal = FALSE, d = 1,
+                                    approximation = FALSE,
+                                    stepwise = FALSE)
+import_no_petr.arima3 <- auto.arima(import_no_petr, seasonal = TRUE, d = 1)
+import_no_petr.arima4 <- auto.arima(import_no_petr, seasonal = TRUE, d = 1,
+                                    approximation = FALSE,
+                                    stepwise = FALSE)
+
+# Determine the best model using the AIC criterion
+import_no_petr_m <- rep(0,4)
+import_no_petr_m[1] <- import_no_petr.arima1$aic
+import_no_petr_m[2] <- import_no_petr.arima2$aic
+import_no_petr_m[3] <- import_no_petr.arima3$aic
+import_no_petr_m[4] <- import_no_petr.arima4$aic
+import_no_petr_m
+which(import_no_petr_m == min(import_no_petr_m))
+``` 
+```{r arima4_res, fig.width = 7, fig.height = 4}
+checkresiduals(import_no_petr.arima4)
+import_no_petr.arima4
+
+autoplot(forecast(import_no_petr.arima4)) + 
+  ggtitle('Non-Oil Imports SARIMA(3,1,0)(2,0,0)[12]') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(import_no_petr.arima4)),
+           'inp_arima.xlsx', 
+           sheetName = 'ImporNoPetro')
+```
+<br />
+
+
+
+#### **Holt-Winters model estimation**
+<br />
+
+##### **Oil Exports**
+```{r hw1_res, fig.width = 7, fig.height = 4}
+export_petr_HW <- HoltWinters(export_petr)
+
+autoplot(forecast(export_petr_HW)) + 
+  ggtitle('Oil Exports HW') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(export_petr_HW)),
+           'ep_HW.xlsx', 
+           sheetName = 'ExporPetro')
+```
+
+##### **Non-Oil Exports**
+```{r hw2_res, fig.width = 7, fig.height = 4}
+export_no_petr_HW <- HoltWinters(export_no_petr)
+
+autoplot(forecast(export_no_petr_HW)) + 
+  ggtitle('Non-Oil Exports HW') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(export_no_petr_HW)),
+           'enp_HW.xlsx', 
+           sheetName = 'ExporNoPetro')
+```
+
+##### **Oil Imports**
+```{r hw3_res, fig.width = 7, fig.height = 4}
+import_petr_HW <- HoltWinters(import_petr)
+
+autoplot(forecast(import_petr_HW)) + 
+  ggtitle('Oil Imports HW') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(import_petr_HW)),
+           'ip_HW.xlsx', 
+           sheetName = 'ImporPetro')
+```
+
+##### **Non-Oil Imports**
+```{r hw4_res, fig.width = 7, fig.height = 4}
+import_no_petr_HW <- HoltWinters(import_no_petr)
+
+autoplot(forecast(import_no_petr_HW)) + 
+  ggtitle('Non-Oil Imports HW') + 
+  ylab('Million USD FOB')
+
+write.xlsx(as.data.frame(forecast(import_no_petr_HW)),
+           'inp_HW.xlsx', 
+           sheetName = 'ImporNoPetro')
+```
